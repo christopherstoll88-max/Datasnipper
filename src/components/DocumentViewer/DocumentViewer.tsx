@@ -4,13 +4,13 @@ import { SelectionOverlay } from "./SelectionOverlay";
 import { useDocumentStore } from "@/store/documentStore";
 import { useSnipStore } from "@/store/snipStore";
 import { getDocumentBlob } from "@/services/storage/DocumentStore";
-import { loadPdf, renderPage } from "@/services/pdf/PdfService";
-import { pixelToNorm, normToPixel, cropCanvas, rectFromPoints } from "@/utils/geometry";
+import { loadPdf, renderPage, extractNativeText } from "@/services/pdf/PdfService";
+import { pixelToNorm, cropCanvas, rectFromPoints } from "@/utils/geometry";
 import { tesseractService } from "@/services/ocr/TesseractService";
-import { writeCellLink, getActiveCell } from "@/services/excel/ExcelService";
 import { useAuditStore } from "@/store/auditStore";
 import { CellLink } from "@/models/CellLink";
 import { DocumentRegion } from "@/models/Region";
+import { extractInvoiceFields, InvoiceField } from "@/services/invoice/InvoiceExtractorService";
 
 interface Props {
   documentId: string;
@@ -19,6 +19,8 @@ interface Props {
 export function DocumentViewer({ documentId }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [invoiceFields, setInvoiceFields] = useState<InvoiceField[] | null>(null);
+  const [extracting, setExtracting] = useState(false);
 
   const { documents, currentPage, totalPages, zoom, setCurrentPage, setTotalPages } =
     useDocumentStore();
@@ -44,7 +46,6 @@ export function DocumentViewer({ documentId }: Props) {
           setTotalPages(pdfDoc.numPages);
           await renderPage(pdfDoc, currentPage, zoom, canvasRef.current!);
         } else {
-          // Image
           setTotalPages(1);
           const blob = new Blob([buffer]);
           const url = URL.createObjectURL(blob);
@@ -69,6 +70,56 @@ export function DocumentViewer({ documentId }: Props) {
     return () => { cancelled = true; };
   }, [documentId, currentPage, zoom, doc]);
 
+  const handleExtract = useCallback(async () => {
+    if (!doc || doc.type !== "pdf") return;
+    setExtracting(true);
+    setInvoiceFields(null);
+    try {
+      const buffer = await getDocumentBlob(documentId);
+      if (!buffer) return;
+      const pdfDoc = await loadPdf(documentId, buffer);
+      // Extract text from all pages and combine
+      const pages = Array.from({ length: pdfDoc.numPages }, (_, i) => i + 1);
+      const texts = await Promise.all(pages.map((p) => extractNativeText(pdfDoc, p)));
+      const fullText = texts.join("\n");
+      setInvoiceFields(extractInvoiceFields(fullText));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setExtracting(false);
+    }
+  }, [documentId, doc]);
+
+  const handleSendToCell = useCallback(async (value: string) => {
+    const { onSelectionChange } = await import("@/services/excel/ExcelService");
+    const { getWorkbookId } = await import("@/utils/officeHelpers");
+
+    awaitCell();
+    const unsubscribe = onSelectionChange(async (sheet, address) => {
+      unsubscribe();
+      const { writeCellLink } = await import("@/services/excel/ExcelService");
+      const cellLink: CellLink = {
+        id: crypto.randomUUID(),
+        workbookId: getWorkbookId(),
+        sheetName: sheet,
+        cellAddress: address,
+        region: { documentId, pageNumber: currentPage, x: 0, y: 0, width: 1, height: 1 },
+        extractedText: value,
+        extractedType: "raw_text",
+        confidence: 1,
+      };
+      await writeCellLink(cellLink);
+      await addRecord({
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        action: "snip",
+        cellLink,
+        newValue: value,
+      });
+      reset();
+    });
+  }, [documentId, currentPage, awaitCell, addRecord, reset]);
+
   const handleRegionSelected = useCallback(
     async (x1: number, y1: number, x2: number, y2: number) => {
       const canvas = canvasRef.current;
@@ -85,7 +136,6 @@ export function DocumentViewer({ documentId }: Props) {
 
       setRegion(region);
 
-      // Crop and OCR
       const cropped = cropCanvas(canvas, pixelRect);
       region.pixelSnapshot = cropped.toDataURL("image/png");
 
@@ -106,7 +156,6 @@ export function DocumentViewer({ documentId }: Props) {
 
         awaitCell();
 
-        // Wait for user to click a cell
         const { writeCellLink: writeLink, onSelectionChange } = await import("@/services/excel/ExcelService");
         const { getWorkbookId } = await import("@/utils/officeHelpers");
 
@@ -150,7 +199,7 @@ export function DocumentViewer({ documentId }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid #e0e0e0", background: "#f8f8f8" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid #e0e0e0", background: "#f8f8f8", flexShrink: 0 }}>
         <Button
           size="small"
           appearance={phase === "selecting" ? "primary" : "secondary"}
@@ -158,6 +207,12 @@ export function DocumentViewer({ documentId }: Props) {
         >
           {phase === "selecting" ? "✕ Abbrechen" : "✂ Snip"}
         </Button>
+
+        {doc?.type === "pdf" && (
+          <Button size="small" appearance="secondary" onClick={handleExtract} disabled={extracting}>
+            {extracting ? "…" : "Auslesen"}
+          </Button>
+        )}
 
         {phase === "awaiting_cell" && (
           <span style={{ fontSize: 11, color: "#0078d4" }}>
@@ -179,6 +234,25 @@ export function DocumentViewer({ documentId }: Props) {
         <span style={{ fontSize: 11 }}>{Math.round(zoom * 100)}%</span>
         <Button size="small" onClick={() => useDocumentStore.getState().setZoom(zoom + 0.25)}>+</Button>
       </div>
+
+      {/* Invoice extraction results */}
+      {invoiceFields && (
+        <div style={{ flexShrink: 0, borderBottom: "1px solid #e0e0e0", background: "#fafafa", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 4 }}>
+          {invoiceFields.map((field) => (
+            <div key={field.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+              <span style={{ width: 110, color: "#555", flexShrink: 0 }}>{field.label}:</span>
+              <span style={{ flex: 1, fontWeight: 600, color: field.value ? "#000" : "#aaa" }}>
+                {field.value ?? "nicht gefunden"}
+              </span>
+              {field.value && (
+                <Button size="small" appearance="subtle" onClick={() => handleSendToCell(field.value!)}>
+                  → Zelle
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Canvas + overlay */}
       <div style={{ flex: 1, overflow: "auto", position: "relative", background: "#666" }}>
