@@ -57,7 +57,7 @@ export function DocumentPanel() {
   };
 
   return (
-    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
+    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0 }}>
       <FileUploader onFile={handleFile} />
 
       {uploading && (
