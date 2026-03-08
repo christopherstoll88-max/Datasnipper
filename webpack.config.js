@@ -65,7 +65,17 @@ module.exports = (env, argv) => {
     ],
     devServer: {
       port: 3000,
-      server: "https",
+      server: {
+        type: "https",
+        options: {
+          cert: require("fs").readFileSync(
+            require("path").join(require("os").homedir(), ".office-addin-dev-certs/localhost.crt")
+          ),
+          key: require("fs").readFileSync(
+            require("path").join(require("os").homedir(), ".office-addin-dev-certs/localhost.key")
+          ),
+        },
+      },
       hot: true,
       headers: {
         "Access-Control-Allow-Origin": "*",
