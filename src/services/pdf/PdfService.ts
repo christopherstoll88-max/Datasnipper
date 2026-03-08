@@ -75,3 +75,51 @@ export async function extractNativeText(
     .map((item) => ("str" in item ? item.str : ""))
     .join(" ");
 }
+
+/**
+ * Extract native text preserving line structure using y-coordinate grouping.
+ * Returns an array of lines (top to bottom), each line being the concatenated
+ * text of items on the same horizontal level.
+ */
+export async function extractNativeTextLines(
+  doc: PDFDocumentProxy,
+  pageNumber: number
+): Promise<string[]> {
+  const page = await doc.getPage(pageNumber);
+  const textContent = await page.getTextContent();
+  page.cleanup();
+
+  const raw = textContent.items
+    .filter((item): item is typeof item & { str: string; transform: number[] } =>
+      "str" in item && typeof (item as any).str === "string" && (item as any).str.trim() !== ""
+    )
+    .map((item) => ({
+      text: (item as any).str as string,
+      x: (item as any).transform[4] as number,
+      y: (item as any).transform[5] as number,
+    }));
+
+  if (raw.length === 0) return [];
+
+  // Sort top-to-bottom (PDF y is bottom-up → descending y = top-to-bottom), then left-to-right
+  raw.sort((a, b) => b.y - a.y || a.x - b.x);
+
+  // Group into lines: items within LINE_TOLERANCE px of the same y belong to one line
+  const LINE_TOLERANCE = 4;
+  const lines: string[] = [];
+  let group: typeof raw = [raw[0]];
+  let lastY = raw[0].y;
+
+  for (let i = 1; i < raw.length; i++) {
+    if (Math.abs(raw[i].y - lastY) <= LINE_TOLERANCE) {
+      group.push(raw[i]);
+    } else {
+      lines.push(group.map((g) => g.text).join(" ").trim());
+      group = [raw[i]];
+      lastY = raw[i].y;
+    }
+  }
+  if (group.length > 0) lines.push(group.map((g) => g.text).join(" ").trim());
+
+  return lines.filter((l) => l.length > 0);
+}

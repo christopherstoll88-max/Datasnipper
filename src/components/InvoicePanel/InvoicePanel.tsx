@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { Button } from "@fluentui/react-components";
 import { useDocumentStore } from "@/store/documentStore";
 import { getDocumentBlob } from "@/services/storage/DocumentStore";
-import { loadPdf, renderPage, extractNativeText } from "@/services/pdf/PdfService";
+import { loadPdf, renderPage, extractNativeText, extractNativeTextLines } from "@/services/pdf/PdfService";
 import { tesseractService } from "@/services/ocr/TesseractService";
 import {
   INVOICE_COLUMNS,
   InvoiceRecord,
-  extractInvoiceRecord,
+  extractInvoiceRecordFromLines,
 } from "@/services/invoice/InvoiceExtractorService";
 import { writeInvoiceTable } from "@/services/excel/ExcelService";
 
@@ -35,26 +35,33 @@ export function InvoicePanel() {
       const pdfDoc = await loadPdf(doc.id, buffer);
       const pages = Array.from({ length: pdfDoc.numPages }, (_, j) => j + 1);
 
-      // Try native text first
-      const nativeTexts = await Promise.all(
-        pages.map((p) => extractNativeText(pdfDoc, p))
+      // Try native text first (line-structured)
+      const nativeLineArrays = await Promise.all(
+        pages.map((p) => extractNativeTextLines(pdfDoc, p))
       );
-      let fullText = nativeTexts.join("\n").trim();
+      let allLines: string[] = nativeLineArrays.flat();
+      const nativeText = allLines.join(" ").trim();
 
       // Fallback to OCR if native text is too short
-      if (fullText.length <= 30) {
+      if (nativeText.length <= 30) {
         setProgress(`${i + 1}/${pdfs.length}: ${doc.name} (OCR...)`);
-        const ocrTexts: string[] = [];
+        const ocrLines: string[] = [];
         for (const pageNum of pages) {
           const offscreen = document.createElement("canvas");
           await renderPage(pdfDoc, pageNum, 2.0, offscreen);
           const result = await tesseractService.recognise(offscreen, doc.id, pageNum);
-          ocrTexts.push(result.blocks.map((b) => b.text).join(" "));
+          // OCR blocks already have natural line order
+          result.blocks.forEach((b) => {
+            b.text.split(/\r?\n/).forEach((l) => {
+              const t = l.trim();
+              if (t) ocrLines.push(t);
+            });
+          });
         }
-        fullText = ocrTexts.join("\n");
+        allLines = ocrLines;
       }
 
-      extracted.push({ name: doc.name, record: extractInvoiceRecord(fullText) });
+      extracted.push({ name: doc.name, record: extractInvoiceRecordFromLines(allLines) });
     }
 
     setResults(extracted);
