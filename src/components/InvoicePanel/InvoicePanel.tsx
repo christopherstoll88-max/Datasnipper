@@ -80,7 +80,7 @@ export function InvoicePanel() {
   };
 
   return (
-    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10, height: "100%", overflowY: "auto" }}>
       <div style={{ fontSize: 13, fontWeight: 600 }}>Rechnungen auslesen</div>
 
       <div style={{ fontSize: 12, color: "#555" }}>
