@@ -59,8 +59,10 @@ html, body, #root {
 
 .panel-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .snip-overlay-active {

@@ -148,7 +148,7 @@ export function DocumentViewer({ documentId }: Props) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderBottom: "1px solid #e0e0e0", background: "#f8f8f8" }}>
         <Button
