@@ -72,7 +72,7 @@ export function AuditPanel() {
             : "Keine Ergebnisse für die Suche."}
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", flex: 1, minHeight: 0 }}>
           {filtered.map((record) => (
             <AuditEntry key={record.id} record={record} />
           ))}
