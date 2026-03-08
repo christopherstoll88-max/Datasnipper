@@ -65,7 +65,7 @@ module.exports = (env, argv) => {
     ],
     devServer: {
       port: 3000,
-      https: true,
+      server: "https",
       hot: true,
       headers: {
         "Access-Control-Allow-Origin": "*",
