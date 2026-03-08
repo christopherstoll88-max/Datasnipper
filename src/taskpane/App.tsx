@@ -4,9 +4,11 @@ import { useAuditStore } from "@/store/auditStore";
 import { DocumentPanel } from "@/components/shared/DocumentPanel";
 import { OCRPanel } from "@/components/OCRPanel/OCRPanel";
 import { AuditPanel } from "@/components/AuditTrail/AuditPanel";
+import { InvoicePanel } from "@/components/InvoicePanel/InvoicePanel";
 
 const TABS: { id: ActivePanel; label: string }[] = [
   { id: "documents", label: "Dokumente" },
+  { id: "invoices", label: "Rechnungen" },
   { id: "ocr", label: "OCR" },
   { id: "audit", label: "Audit" },
 ];
@@ -51,6 +53,7 @@ export function App() {
 
       <div className="panel-content">
         {activePanel === "documents" && <DocumentPanel />}
+        {activePanel === "invoices" && <InvoicePanel />}
         {activePanel === "ocr" && <OCRPanel />}
         {activePanel === "audit" && <AuditPanel />}
       </div>

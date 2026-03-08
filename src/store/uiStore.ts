@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ActivePanel = "documents" | "ocr" | "audit";
+export type ActivePanel = "documents" | "invoices" | "ocr" | "audit";
 
 interface UiState {
   activePanel: ActivePanel;

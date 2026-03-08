@@ -100,6 +100,48 @@ export function onSelectionChange(
 }
 
 /**
+ * Write invoice table: header row at A1, data rows below.
+ * Each call appends rows after any existing invoice data.
+ */
+export async function writeInvoiceTable(
+  headers: readonly string[],
+  rows: string[][]
+): Promise<number> {
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+
+    // Write header in row 1 (A1:L1 etc.)
+    const lastCol = String.fromCharCode(64 + headers.length); // A=65, so 64+1=A
+    const headerRange = sheet.getRange(`A1:${lastCol}1`);
+    headerRange.values = [headers as unknown as string[]];
+    headerRange.format.font.bold = true;
+    headerRange.format.fill.color = "#D9E2F3";
+
+    // Find first empty row after header
+    const usedRange = sheet.getUsedRange();
+    usedRange.load("rowCount");
+    await context.sync();
+
+    const startRow = usedRange.rowCount + 1; // 1-based, after existing data
+
+    // Write data rows
+    if (rows.length > 0) {
+      const dataRange = sheet.getRange(
+        `A${startRow}:${lastCol}${startRow + rows.length - 1}`
+      );
+      dataRange.values = rows;
+    }
+
+    // Auto-fit columns
+    const fullRange = sheet.getRange(`A1:${lastCol}${startRow + rows.length - 1}`);
+    fullRange.format.autofitColumns();
+
+    await context.sync();
+    return startRow;
+  });
+}
+
+/**
  * Clear highlight from a cell (when a link is removed).
  */
 export async function clearCellHighlight(sheetName: string, cellAddress: string): Promise<void> {
