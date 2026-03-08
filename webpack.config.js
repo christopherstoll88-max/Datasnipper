@@ -46,15 +46,10 @@ module.exports = (env, argv) => {
             from: "node_modules/pdfjs-dist/build/pdf.worker.mjs",
             to: "pdf.worker.mjs",
           },
-          // Tesseract WASM + worker
+          // Tesseract worker (core WASM is loaded from CDN by the worker)
           {
             from: "node_modules/tesseract.js/dist/worker.min.js",
             to: "tesseract-worker.min.js",
-          },
-          {
-            from: "node_modules/tesseract.js-core/tesseract-core.wasm.js",
-            to: "tesseract-core.wasm.js",
-            noErrorOnMissing: true,
           },
           // Assets
           { from: "assets", to: "assets", noErrorOnMissing: true },

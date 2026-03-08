@@ -16,9 +16,7 @@ class TesseractService {
 
     this.initPromise = (async () => {
       this.worker = await createWorker("deu+eng", 1, {
-        workerPath: "/tesseract-worker.min.js",
         langPath: "https://tessdata.projectnaptha.com/4.0.0",
-        corePath: "/tesseract-core.wasm.js",
         logger: () => {}, // suppress internal logs
       });
     })();
