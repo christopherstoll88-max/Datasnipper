@@ -2,7 +2,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 // Worker must be served from same origin (copied by webpack CopyPlugin)
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://localhost:3000/pdf.worker.mjs";
 
 const loadedDocs = new Map<string, PDFDocumentProxy>();
 

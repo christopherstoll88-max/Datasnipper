@@ -12,9 +12,11 @@ export function DocumentPanel() {
   const { documents, activeDocumentId, addDocument, removeDocument, setActiveDocument } =
     useDocumentStore();
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFile = async (file: File) => {
     setUploading(true);
+    setUploadError(null);
     try {
       const buffer = await file.arrayBuffer();
       const hash = await sha256(buffer);
@@ -43,6 +45,7 @@ export function DocumentPanel() {
       setActiveDocument(snipDoc.id);
     } catch (e) {
       console.error("Upload failed", e);
+      setUploadError(String(e));
     } finally {
       setUploading(false);
     }
@@ -60,6 +63,12 @@ export function DocumentPanel() {
       {uploading && (
         <div style={{ textAlign: "center", color: "#0078d4", fontSize: 12 }}>
           Wird geladen…
+        </div>
+      )}
+
+      {uploadError && (
+        <div style={{ background: "#fde7e9", padding: 8, color: "#a80000", fontSize: 12, borderRadius: 4 }}>
+          Fehler: {uploadError}
         </div>
       )}
 
