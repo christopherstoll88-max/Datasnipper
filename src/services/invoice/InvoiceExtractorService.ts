@@ -72,7 +72,8 @@ function findByLabel(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     for (const pat of labelPatterns) {
-      const re = new RegExp(pat.source, pat.flags.replace("g", "") + "i");
+      const flags = [...new Set(pat.flags.replace("g", "").split("").concat("i"))].join("");
+      const re = new RegExp(pat.source, flags);
       const m = re.exec(line);
       if (!m) continue;
 
@@ -98,7 +99,8 @@ function findByLabel(
 /** Find first regex match across all lines */
 function findFirst(lines: string[], pattern: RegExp): string {
   for (const line of lines) {
-    const re = new RegExp(pattern.source, pattern.flags.replace("g", "") + "i");
+    const flags = [...new Set(pattern.flags.replace("g", "").split("").concat("i"))].join("");
+    const re = new RegExp(pattern.source, flags);
     const m = re.exec(line);
     if (m) return (m[1] ?? m[0]).trim();
   }
