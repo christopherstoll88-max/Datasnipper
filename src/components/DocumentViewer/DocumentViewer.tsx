@@ -78,11 +78,28 @@ export function DocumentViewer({ documentId }: Props) {
       const buffer = await getDocumentBlob(documentId);
       if (!buffer) return;
       const pdfDoc = await loadPdf(documentId, buffer);
-      // Extract text from all pages and combine
       const pages = Array.from({ length: pdfDoc.numPages }, (_, i) => i + 1);
-      const texts = await Promise.all(pages.map((p) => extractNativeText(pdfDoc, p)));
-      const fullText = texts.join("\n");
-      setInvoiceFields(extractInvoiceFields(fullText));
+
+      // 1. Try native text first (fast)
+      const nativeTexts = await Promise.all(pages.map((p) => extractNativeText(pdfDoc, p)));
+      const nativeFullText = nativeTexts.join("\n").trim();
+
+      // If native text has enough content, use it
+      if (nativeFullText.length > 30) {
+        setInvoiceFields(extractInvoiceFields(nativeFullText));
+        return;
+      }
+
+      // 2. Fallback: OCR via Tesseract (scanned PDF)
+      const ocrTexts: string[] = [];
+      for (const pageNum of pages) {
+        const offscreen = document.createElement("canvas");
+        await renderPage(pdfDoc, pageNum, 2.0, offscreen); // render at 2x for better OCR
+        const result = await tesseractService.recognise(offscreen, documentId, pageNum);
+        ocrTexts.push(result.blocks.map((b) => b.text).join(" "));
+      }
+      const ocrFullText = ocrTexts.join("\n");
+      setInvoiceFields(extractInvoiceFields(ocrFullText));
     } catch (e) {
       setError(String(e));
     } finally {
