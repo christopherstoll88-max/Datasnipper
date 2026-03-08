@@ -26,7 +26,7 @@ export function DocumentPanel() {
       if (type === "pdf") {
         const { loadPdf } = await import("@/services/pdf/PdfService");
         const id = crypto.randomUUID();
-        const doc = await loadPdf(id, buffer);
+        const doc = await loadPdf(id, buffer.slice(0));
         pageCount = doc.numPages;
       }
 
