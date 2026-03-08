@@ -24,9 +24,13 @@ export function unloadPdf(id: string): void {
   }
 }
 
+import type { RenderTask } from "pdfjs-dist";
+
+let activeRenderTask: RenderTask | null = null;
+
 /**
  * Render a PDF page to a canvas at the given scale.
- * Returns the canvas element (caller responsible for mounting).
+ * Cancels any ongoing render on the same canvas first.
  */
 export async function renderPage(
   doc: PDFDocumentProxy,
@@ -34,13 +38,29 @@ export async function renderPage(
   scale: number,
   canvas: HTMLCanvasElement
 ): Promise<void> {
+  if (activeRenderTask) {
+    activeRenderTask.cancel();
+    activeRenderTask = null;
+  }
+
   const page = await doc.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   const ctx = canvas.getContext("2d")!;
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  page.cleanup();
+
+  const task = page.render({ canvasContext: ctx, viewport });
+  activeRenderTask = task;
+
+  try {
+    await task.promise;
+  } catch (e: any) {
+    if (e?.name === "RenderingCancelledException") return;
+    throw e;
+  } finally {
+    if (activeRenderTask === task) activeRenderTask = null;
+    page.cleanup();
+  }
 }
 
 /** Extract native text layer from a PDF page (fast path, no OCR needed) */
